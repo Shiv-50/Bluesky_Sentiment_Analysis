@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Kafka topic
+TOPIC="bluesky_search"
+BROKER="localhost:9092"
+
+# HDFS file path
+HDFS_FILE="/user/hadoop/data.txt"
+LOCAL_TEMP_FILE="/tmp/data.txt"
+
+# Ensure the local temp file exists
+touch "$LOCAL_TEMP_FILE"
+
+# Consume messages from Kafka and append them to HDFS
+kafka-console-consumer.sh --topic "$TOPIC" --bootstrap-server "$BROKER" | while read line; do
+    TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+    
+    # Append message with timestamp locally
+    echo -e "$TIMESTAMP\t$(echo "$line" | jq -r '[.query,.text,.author,.likes]|@tsv')\n" >> "$LOCAL_TEMP_FILE"
+
+    # Append the local file to HDFS
+    hdfs dfs -appendToFile "$LOCAL_TEMP_FILE" "$HDFS_FILE"
+
+    # Clear the local file after appending
+    > "$LOCAL_TEMP_FILE"
+
+    echo "✅ Appended new data to $HDFS_FILE in HDFS"
+done
